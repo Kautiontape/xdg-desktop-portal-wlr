@@ -22,7 +22,7 @@ struct xdpw_wlr_output *xdpw_wlr_output_find_by_name(struct wl_list *output_list
 
 bool xdpw_wlr_target_chooser(struct xdpw_screencast_context *ctx, struct xdpw_screencast_target *target, uint32_t type_mask);
 bool xdpw_wlr_target_from_data(struct xdpw_screencast_context *ctx, struct xdpw_screencast_target *target,
-		struct xdpw_screencast_restore_data *data);
+		struct xdpw_screencast_restore_data *data, uint32_t type_mask);
 
 void xdpw_wlr_frame_capture(struct xdpw_screencast_instance *cast);
 int xdpw_wlr_session_init(struct xdpw_screencast_instance *cast);

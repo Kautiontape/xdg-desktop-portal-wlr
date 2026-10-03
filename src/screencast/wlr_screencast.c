@@ -171,17 +171,41 @@ static struct xdpw_wlr_output *xdpw_wlr_output_find(struct xdpw_screencast_conte
 	return NULL;
 }
 
-bool xdpw_wlr_target_from_data(struct xdpw_screencast_context *ctx, struct xdpw_screencast_target *target,
-		struct xdpw_screencast_restore_data *data) {
-	struct xdpw_wlr_output *out = NULL;
-	out = xdpw_wlr_output_find_by_name(&ctx->output_list, data->output_name);
-
-	if (!out) {
-		return false;
+static struct xdpw_toplevel *xdpw_toplevel_find_by_identifier(struct wl_list *toplevels,
+		const char *identifier) {
+	struct xdpw_toplevel *toplevel;
+	wl_list_for_each(toplevel, toplevels, link) {
+		if (toplevel->identifier && strcmp(toplevel->identifier, identifier) == 0) {
+			return toplevel;
+		}
 	}
-	target->type = MONITOR;
-	target->output = out;
-	return true;
+	return NULL;
+}
+
+bool xdpw_wlr_target_from_data(struct xdpw_screencast_context *ctx, struct xdpw_screencast_target *target,
+		struct xdpw_screencast_restore_data *data, uint32_t type_mask) {
+	// restore_data may carry either key, so never assume output_name is set.
+	if (data->output_name && (type_mask & MONITOR)) {
+		struct xdpw_wlr_output *out = xdpw_wlr_output_find_by_name(&ctx->output_list, data->output_name);
+		if (out) {
+			target->type = MONITOR;
+			target->output = out;
+			return true;
+		}
+	}
+	// ext-foreign-toplevel identifiers are unique per mapped toplevel and die
+	// with it, so a closed or remapped window misses here and falls back to
+	// the chooser.
+	if (data->toplevel_identifier && (type_mask & WINDOW)) {
+		struct xdpw_toplevel *toplevel =
+			xdpw_toplevel_find_by_identifier(&ctx->toplevels, data->toplevel_identifier);
+		if (toplevel) {
+			target->type = WINDOW;
+			target->toplevel = toplevel;
+			return true;
+		}
+	}
+	return false;
 }
 
 static void wlr_remove_output(struct xdpw_wlr_output *out) {

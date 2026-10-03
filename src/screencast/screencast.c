@@ -160,7 +160,7 @@ bool setup_target(struct xdpw_screencast_context *ctx, struct xdpw_session *sess
 	}
 	target->with_cursor = sess->screencast_data.cursor_mode == EMBEDDED;
 	if (data) {
-		target_initialized = xdpw_wlr_target_from_data(ctx, target, data);
+		target_initialized = xdpw_wlr_target_from_data(ctx, target, data, type_mask);
 	}
 	if (!target_initialized) {
 		target_initialized = xdpw_wlr_target_chooser(ctx, target, type_mask);
@@ -437,6 +437,10 @@ static int method_screencast_select_sources(sd_bus_message *msg, void *data,
 					if (strcmp(rdKey, "output_name") == 0) {
 						sd_bus_message_read(msg, "v", "s", &restore_data.output_name);
 						logprint(INFO, "dbus: option restore_data.output_name: %s", restore_data.output_name);
+					} else if (strcmp(rdKey, "toplevel_identifier") == 0) {
+						sd_bus_message_read(msg, "v", "s", &restore_data.toplevel_identifier);
+						logprint(INFO, "dbus: option restore_data.toplevel_identifier: %s",
+							restore_data.toplevel_identifier);
 					} else {
 						logprint(WARN, "dbus: unknown option %s", rdKey);
 						sd_bus_message_skip(msg, "v");
@@ -695,6 +699,17 @@ static int method_screencast_start(sd_bus_message *msg, void *data,
 			"restore_data", "(suv)",
 			"wlroots", XDP_CAST_DATA_VER,
 			"a{sv}", 1, "output_name", "s", restore_data.output_name);
+		if (ret < 0) {
+			return ret;
+		}
+	} else if (sess->screencast_data.persist_mode != PERSIST_NONE && cast->target->toplevel
+			&& cast->target->toplevel->identifier) {
+		// Restored sessions land here too, so a client that restarts its
+		// capture (Chromium does on every constraint change) can chain-restore.
+		ret = sd_bus_message_append(reply, "{sv}",
+			"restore_data", "(suv)",
+			"wlroots", XDP_CAST_DATA_VER,
+			"a{sv}", 1, "toplevel_identifier", "s", cast->target->toplevel->identifier);
 		if (ret < 0) {
 			return ret;
 		}
