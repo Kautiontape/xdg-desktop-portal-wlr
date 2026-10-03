@@ -1,0 +1,59 @@
+# Maintainer: Shawn Squire <shawn@shawnsquire.me>
+#
+# Template for the ktn build of xdg-desktop-portal-wlr. Kautiontape/ktn-repo's
+# scripts/build-package.sh fills in @PKGVER@/@UPSTREAM_VERSION@ and supplies
+# ktn-src.tar.gz, a `git archive` of the ktn branch.
+#
+# Mirrors Arch's xdg-desktop-portal-wlr PKGBUILD so it drops in for it, plus the
+# systemd drop-in that turns screencast restore tokens on.
+
+pkgname=xdg-desktop-portal-wlr-ktn
+_pkgname=xdg-desktop-portal-wlr
+pkgver=@PKGVER@
+pkgrel=1
+pkgdesc='xdg-desktop-portal backend for wlroots — ktn build that remembers window shares'
+arch=('x86_64')
+url='https://github.com/Kautiontape/xdg-desktop-portal-wlr'
+license=('MIT')
+depends=(
+  'glibc'
+  'grim'
+  'libdrm'
+  'libinih'
+  'libpipewire'
+  'mesa'
+  'pipewire'
+  'pipewire-session-manager'
+  'slurp'
+  'systemd-libs'
+  'wayland'
+  'xdg-desktop-portal'
+)
+makedepends=(
+  'meson'
+  'scdoc'
+  'wayland-protocols'
+)
+provides=('xdg-desktop-portal-impl' "${_pkgname}=@UPSTREAM_VERSION@")
+conflicts=("${_pkgname}")
+source=('ktn-src.tar.gz')
+sha256sums=('SKIP')
+
+build() {
+  cd ktn-src
+  arch-meson -Dsd-bus-provider=libsystemd build
+  ninja -C build
+}
+
+package() {
+  cd ktn-src
+  DESTDIR="$pkgdir" ninja -C build install
+  install -vDm644 -t "$pkgdir/usr/share/licenses/$pkgname" LICENSE
+
+  # Same as Arch's package: fix detection with x-d-p >= 1.18.
+  install -vDm644 -t "$pkgdir/usr/share/xdg-desktop-portal" packaging/arch/wlr-portals.conf
+
+  # Without this xdpw never issues restore tokens and the window-restore patch is inert.
+  install -vDm644 packaging/arch/ktn-persist.conf \
+    "$pkgdir/usr/lib/systemd/user/${_pkgname}.service.d/ktn-persist.conf"
+}
