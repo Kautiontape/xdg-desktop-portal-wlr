@@ -149,6 +149,7 @@ struct xdpw_screencast_target {
 struct xdpw_screencast_restore_data {
 	uint32_t version;
 	const char *output_name;
+	const char *toplevel_identifier;
 };
 
 struct xdpw_format_modifier_pair {
