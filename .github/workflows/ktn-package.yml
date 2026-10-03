@@ -1,0 +1,20 @@
+name: ktn package
+# Builds this fork's Arch package with Kautiontape/ktn-repo's reusable workflow.
+#   push to ktn      -> build + upload to this repo's `ktn-repo` release; ktn-repo's
+#                       nightly publish pulls it into [ktn]
+#   push to sync/**  -> build only: the gate check ktn-promote waits for
+on:
+  push:
+    branches: [ktn, 'sync/**']
+    paths-ignore: ['**/*.md', 'docs/**']
+  workflow_dispatch:
+concurrency:
+  group: ktn-package-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: write
+jobs:
+  package:
+    uses: Kautiontape/ktn-repo/.github/workflows/build-package.yml@main
+    with:
+      publish: ${{ github.ref == 'refs/heads/ktn' }}
