@@ -93,6 +93,10 @@ void xdpw_screencast_instance_destroy(struct xdpw_screencast_instance *cast) {
 			xdpw_destroy_timer(timer);
 		}
 	}
+	// Freed above. The stream teardown below fires state_changed, which
+	// destroys these again unless they are cleared.
+	cast->process_retry = NULL;
+	cast->start_kick = NULL;
 	struct xdpw_session *sess, *stmp;
 	wl_list_for_each_safe(sess, stmp, &cast->ctx->state->xdpw_sessions, link) {
 		if (sess->screencast_data.screencast_instance == cast) {
