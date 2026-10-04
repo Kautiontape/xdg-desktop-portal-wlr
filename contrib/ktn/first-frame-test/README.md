@@ -27,5 +27,11 @@ systemctl --user stop xdpw-test; rm "$XDG_RUNTIME_DIR/xdpw-test-target"
 systemctl --user start xdg-desktop-portal-wlr
 ```
 
+**Teardown check.** Chromium closes the thumbnail session before it unlinks its stream, so
+the session can close while the start kicks are still pending. Add `max_fps=5` to the test
+config to stretch the kick window to ~6 s, so every run closes mid-window. Then run the loop
+and check that `systemctl --user show -p NRestarts --value xdpw-test` is still `0`. Before
+the teardown fix, every run segfaulted.
+
 `gst-launch pipewiresrc` can't stand in for Electron here: xdpw's node has
 `object.register=false`, so pipewiresrc cannot target it ("target not found").
