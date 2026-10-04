@@ -353,6 +353,45 @@ static void pwr_disarm_process_retry(struct xdpw_screencast_instance *cast) {
 	cast->process_retry = NULL;
 }
 
+static uint64_t pwr_process_retry_delay(struct xdpw_screencast_instance *cast);
+
+/*
+ * A consumer's stream can report STREAMING before its node is scheduled by our
+ * driver. The first frame, captured and queued the moment we start streaming,
+ * then stays parked until the next graph cycle -- which, for an idle source,
+ * only comes when its content changes, so a client waiting for a first frame
+ * (e.g. a desktopCapturer thumbnail) can wait indefinitely. Re-run the graph a
+ * few times with backoff after starting so the parked frame gets delivered.
+ */
+#define XDPW_START_KICKS 5
+
+static void pwr_start_kick(void *data);
+
+static void pwr_arm_start_kick(struct xdpw_screencast_instance *cast) {
+	if (cast->start_kick || cast->start_kicks_done >= XDPW_START_KICKS) {
+		return;
+	}
+	cast->start_kick = xdpw_add_timer(cast->ctx->state,
+		pwr_process_retry_delay(cast) << cast->start_kicks_done, pwr_start_kick, cast);
+}
+
+static void pwr_disarm_start_kick(struct xdpw_screencast_instance *cast) {
+	xdpw_destroy_timer(cast->start_kick);
+	cast->start_kick = NULL;
+}
+
+static void pwr_start_kick(void *data) {
+	struct xdpw_screencast_instance *cast = data;
+	cast->start_kick = NULL; // timer destroyed in event loop
+	if (!cast->pwr_stream_state) {
+		return;
+	}
+	cast->start_kicks_done++;
+	logprint(TRACE, "pipewire: start kick %u/%u", cast->start_kicks_done, XDPW_START_KICKS);
+	pw_stream_trigger_process(cast->stream);
+	pwr_arm_start_kick(cast);
+}
+
 static void pwr_handle_stream_state_changed(void *data,
 		enum pw_stream_state old, enum pw_stream_state state, const char *error) {
 	struct xdpw_screencast_instance *cast = data;
@@ -367,6 +406,8 @@ static void pwr_handle_stream_state_changed(void *data,
 		cast->pwr_stream_state = true;
 		xdpw_pwr_dequeue_buffer(cast);
 		xdpw_wlr_frame_capture(cast);
+		cast->start_kicks_done = 0;
+		pwr_arm_start_kick(cast);
 		break;
 	case PW_STREAM_STATE_PAUSED:
 		if (old == PW_STREAM_STATE_STREAMING && cast->current_frame.pw_buffer) {
@@ -376,6 +417,7 @@ static void pwr_handle_stream_state_changed(void *data,
 	default:
 		cast->pwr_stream_state = false;
 		pwr_disarm_process_retry(cast);
+		pwr_disarm_start_kick(cast);
 		break;
 	}
 }

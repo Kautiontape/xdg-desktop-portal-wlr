@@ -200,6 +200,8 @@ struct xdpw_screencast_instance {
 	bool pwr_stream_state;
 	uint32_t framerate;
 	struct xdpw_timer *process_retry;
+	struct xdpw_timer *start_kick;
+	uint32_t start_kicks_done;
 
 	// wlroots
 	union {
